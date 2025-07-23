@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>RKEEB | تحليل نسيج الورق</title>
+  <title>RKEEB | تحليل نسيج الورق المتقدم</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
@@ -62,13 +62,13 @@
   </style>
 </head>
 <body>
-  <h2>📄 تحليل نسيج الورق مباشرة</h2>
+  <h2>📄 تحليل نسيج الورق (LBP)</h2>
   <div class="overlay container">
     <video id="video" autoplay></video>
     <div class="box left"></div>
     <div class="box right"></div>
   </div>
-  <button onclick="compareTexture()">تحقق نسيج الورق 📄</button>
+  <button onclick="compareLBP()">تحليل النسيج المحلي 📄</button>
   <div id="result">🟦⬜ بانتظار الالتقاط...</div>
   <canvas id="canvas"></canvas>
 
@@ -81,43 +81,59 @@
       .then(stream => video.srcObject = stream)
       .catch(err => alert("🚫 فشل تشغيل الكاميرا: " + err.message));
 
-    async function compareTexture() {
+    async function compareLBP() {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const leftRegion = ctx.getImageData(40, 80, 100, 100);
-      const rightRegion = ctx.getImageData(canvas.width - 140, 80, 100, 100);
+      const leftData = ctx.getImageData(40, 80, 100, 100);
+      const rightData = ctx.getImageData(canvas.width - 140, 80, 100, 100);
 
-      const leftGray = toGrayArray(leftRegion.data);
-      const rightGray = toGrayArray(rightRegion.data);
+      const leftLBP = calculateLBP(leftData);
+      const rightLBP = calculateLBP(rightData);
 
-      const similarity = histogramSimilarity(leftGray, rightGray);
-      document.getElementById("result").innerText = `📊 نسبة تشابه النسيج: ${similarity}%`;
+      const similarity = compareLBPhist(leftLBP, rightLBP);
+      document.getElementById("result").innerText = `📊 تشابه نسيج LBP: ${similarity}%`;
     }
 
-    function toGrayArray(data) {
+    function calculateLBP(imageData) {
+      const width = imageData.width;
+      const height = imageData.height;
+      const data = imageData.data;
       const gray = [];
+
       for (let i = 0; i < data.length; i += 4) {
-        const avg = Math.floor((data[i] + data[i + 1] + data[i + 2]) / 3);
+        const avg = Math.floor((data[i] + data[i+1] + data[i+2]) / 3);
         gray.push(avg);
       }
-      return gray;
+
+      const lbpHist = Array(256).fill(0);
+
+      for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+          const center = gray[y * width + x];
+          let code = 0;
+          code |= (gray[(y-1)*width + (x-1)] > center) << 7;
+          code |= (gray[(y-1)*width + x] > center) << 6;
+          code |= (gray[(y-1)*width + (x+1)] > center) << 5;
+          code |= (gray[y*width + (x+1)] > center) << 4;
+          code |= (gray[(y+1)*width + (x+1)] > center) << 3;
+          code |= (gray[(y+1)*width + x] > center) << 2;
+          code |= (gray[(y+1)*width + (x-1)] > center) << 1;
+          code |= (gray[y*width + (x-1)] > center);
+          lbpHist[code]++;
+        }
+      }
+
+      return lbpHist;
     }
 
-    function histogramSimilarity(arr1, arr2) {
-      const hist1 = Array(256).fill(0);
-      const hist2 = Array(256).fill(0);
-
-      arr1.forEach(v => hist1[v]++);
-      arr2.forEach(v => hist2[v]++);
-
+    function compareLBPhist(hist1, hist2) {
       let match = 0;
       for (let i = 0; i < 256; i++) {
         match += Math.min(hist1[i], hist2[i]);
       }
-
-      const total = Math.max(arr1.length, arr2.length);
+      const total = Math.max(hist1.reduce((a,b)=>a+b,0), hist2.reduce((a,b)=>a+b,0));
       return Math.floor((match / total) * 100);
     }
   </script>
