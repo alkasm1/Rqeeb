@@ -74,41 +74,48 @@ navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
 });
 
 function analyze() {
+  if (video.readyState < 2) {
+    alert("📷 الكاميرا لم تجهز بعد، أعد المحاولة بعد ثانية");
+    return;
+  }
+
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const boxes = [
-    { name: "يسار", x: 20, y: 60 },
-    { name: "يمين", x: canvas.width - 170, y: 60 },
-  ];
+  setTimeout(() => {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  const results = boxes.map(box => {
-    const data = ctx.getImageData(box.x, box.y, 150, 150);
-    const grid = 5;
-    const step = 150 / grid;
-    const sobelValues = [];
+    const boxes = [
+      { name: "يسار", x: 20, y: 60 },
+      { name: "يمين", x: canvas.width - 170, y: 60 },
+    ];
 
-    for (let gy = 0; gy < grid; gy++) {
-      for (let gx = 0; gx < grid; gx++) {
-        const region = ctx.getImageData(box.x + gx * step, box.y + gy * step, step, step);
-        const sobelVal = sobel(region);
-        sobelValues.push(sobelVal);
+    const results = boxes.map(box => {
+      const grid = 5;
+      const step = 150 / grid;
+      const sobelValues = [];
+
+      for (let gy = 0; gy < grid; gy++) {
+        for (let gx = 0; gx < grid; gx++) {
+          const region = ctx.getImageData(box.x + gx * step, box.y + gy * step, step, step);
+          const sobelVal = sobel(region);
+          sobelValues.push(sobelVal);
+        }
       }
-    }
 
-    const avg = mean(sobelValues);
-    const dev = deviation(sobelValues, avg);
+      const avg = mean(sobelValues);
+      const dev = deviation(sobelValues, avg);
 
-    return {
-      name: box.name,
-      avg: avg.toFixed(2),
-      dev: dev.toFixed(2),
-      stability: describeStability(dev),
-    };
-  });
+      return {
+        name: box.name,
+        avg: avg.toFixed(2),
+        dev: dev.toFixed(2),
+        stability: describeStability(dev),
+      };
+    });
 
-  displayResults(results);
+    displayResults(results);
+  }, 150); // تأخير 150ms لضمان التقاط الصورة
 }
 
 function mean(arr) {
@@ -127,8 +134,8 @@ function displayResults(results) {
   const r1 = results[0];
   const r2 = results[1];
 
-  let comparison = "";
   const devDiff = Math.abs(r1.dev - r2.dev);
+  let comparison = "";
 
   if (devDiff < 3) comparison = "✅ المواد تظهر تشابهًا كبيرًا في استقرار النسيج";
   else if (devDiff < 7) comparison = "🟡 هناك تفاوت معتدل في تشويش المادة بين المربعين";
@@ -150,7 +157,6 @@ function displayResults(results) {
   `;
 }
 
-// دالة Sobel الرمزية للتجريب:
 function sobel(imageData) {
   let sum = 0;
   const data = imageData.data;
