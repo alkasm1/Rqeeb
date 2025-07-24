@@ -5,7 +5,6 @@
   <title>تحقق ومطابقة نسيج | Rqeeb</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="src/style.css" />
-  <script src="src/logic/similarity.js"></script>
   <style>
     body {
       background: #0b0b0b;
@@ -43,6 +42,10 @@
       font-size: 1.2rem;
       color: #fff;
     }
+    progress {
+      width: 100%;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -69,47 +72,98 @@
     <progress id="matchProgress" value="0" max="100"></progress>
   </div>
 
-  <script>
-    async function startTextureCompare() {
-      const original = document.getElementById('originalCam').files[0]
-        || document.getElementById('originalFile').files[0];
-      const check = document.getElementById('checkCam').files[0]
-        || document.getElementById('checkFile').files[0];
+<script>
+async function startTextureCompare() {
+  const original = document.getElementById('originalCam').files[0]
+    || document.getElementById('originalFile').files[0];
+  const check = document.getElementById('checkCam').files[0]
+    || document.getElementById('checkFile').files[0];
 
-      const result = document.getElementById('resultMessage');
-      const progress = document.getElementById('matchProgress');
+  const result = document.getElementById("resultMessage");
+  const progress = document.getElementById("matchProgress");
 
-      if (!original || !check) {
-        result.innerText = "⚠️ يرجى اختيار أو تصوير الملفين أولًا";
-        return;
-      }
+  if (!original || !check) {
+    result.innerText = "⚠️ يرجى اختيار أو تصوير الملفين أولًا";
+    return;
+  }
 
-      result.innerText = "⏳ جاري التحليل النسيجي...";
-      try {
-        const hash1 = await calculateTextureHash(original);
-        const hash2 = await calculateTextureHash(check);
-        const percent = calculateSimilarity(hash1, hash2);
+  result.innerText = "⏳ جاري التحليل النسيجي...";
 
-        progress.value = percent;
-        if (percent >= 90)
-          result.innerText = `✅ تطابق ${percent}% - نسيج مطابق تمامًا`;
-        else if (percent >= 70)
-          result.innerText = `⚠️ تطابق ${percent}% - تحقق يدوي موصى به`;
-        else
-          result.innerText = `❌ تطابق ${percent}% - محتمل اختلاف أو تزوير`;
-      } catch (err) {
-        result.innerText = "❌ حدث خطأ أثناء التحليل. تأكد من نوع الصور.";
-      }
-    }
+  try {
+    const img1 = await loadImage(original);
+    const img2 = await loadImage(check);
 
-    // دالة التحليل النسيجي باستخدام arrayBuffer فقط
-    async function calculateTextureHash(file) {
-      const arrayBuffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-  </script>
+    const stats1 = analyzeImage(img1);
+    const stats2 = analyzeImage(img2);
+
+    const diffAvg = Math.abs(stats1.avg - stats2.avg);
+    const diffDev = Math.abs(stats1.dev - stats2.dev);
+    const score = 100 - Math.min((diffAvg + diffDev) / 2, 100);
+
+    progress.value = score;
+
+    if (score >= 90)
+      result.innerText = `✅ تطابق ${score.toFixed(1)}% - نسيج مطابق تمامًا`;
+    else if (score >= 70)
+      result.innerText = `⚠️ تطابق ${score.toFixed(1)}% - تحقق يدوي موصى به`;
+    else
+      result.innerText = `❌ تطابق ${score.toFixed(1)}% - محتمل اختلاف أو تزوير`;
+
+  } catch (err) {
+    result.innerText = "❌ فشل التحليل، تأكد من الصور المدخلة.";
+  }
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.src = reader.result;
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function analyzeImage(img) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.drawImage(img, 0, 0);
+
+  const regions = [
+    { x: 20, y: 60, w: 150, h: 150 },
+    { x: img.width - 170, y: 60, w: 150, h: 150 }
+  ];
+
+  const values = regions.map(r => sobel(ctx.getImageData(r.x, r.y, r.w, r.h)));
+  const avg = mean(values);
+  const dev = deviation(values, avg);
+  return { avg, dev };
+}
+
+function sobel(imageData) {
+  let sum = 0;
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    sum += gray;
+  }
+  return sum / (imageData.width * imageData.height);
+}
+
+function mean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function deviation(arr, avg) {
+  return Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / arr.length);
+}
+</script>
 
 </body>
 </html>
