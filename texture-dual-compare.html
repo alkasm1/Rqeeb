@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>تحقق نسيجي مباشر | Rqeeb</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="src/style.css" />
+  <script src="src/logic/similarity.js"></script>
+  <style>
+    body {
+      font-family: 'Tajawal', Arial, sans-serif;
+      background: url("bg2.png") no-repeat center center fixed;
+      background-size: cover;
+      color: #fff;
+      text-align: center;
+      padding: 2rem;
+    }
+    .box {
+      max-width: 450px;
+      margin: auto;
+      padding: 1.5rem;
+      background: rgba(0,0,0,0.6);
+      border-radius: 12px;
+      box-shadow: 0 0 10px #000;
+    }
+    input[type="file"], button {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      font-size: 1em;
+      border-radius: 6px;
+      border: none;
+    }
+    button {
+      background: #ff8800;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #e67600;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 1.2em;
+    }
+    .success { color: #00ff99; }
+    .fail { color: #ff4444; }
+  </style>
+</head>
+<body>
+
+  <h1>🧬 تحقق نسيجي من ملفين</h1>
+  <p>اختر أو صوّر الملفين ثم اضغط لبدء التحليل</p>
+
+  <div class="box">
+    <input type="file" accept="image/*" id="originalFile" />
+    <input type="file" accept="image/*" capture="environment" id="originalCam" />
+
+    <input type="file" accept="image/*" id="checkFile" />
+    <input type="file" accept="image/*" capture="environment" id="checkCam" />
+
+    <button onclick="startTextureCompare()">🔍 تحليل النسيج</button>
+    <div id="textureResult" class="result">👁️ بانتظار الملفات...</div>
+    <progress id="textureProgress" value="0" max="100"></progress>
+  </div>
+
+  <script>
+    async function startTextureCompare() {
+      const original = document.getElementById('originalCam').files[0]
+        || document.getElementById('originalFile').files[0];
+      const check = document.getElementById('checkCam').files[0]
+        || document.getElementById('checkFile').files[0];
+
+      const result = document.getElementById('textureResult');
+      const progress = document.getElementById('textureProgress');
+
+      if (!original || !check) {
+        result.innerHTML = "<span class='fail'>⚠️ يرجى اختيار الملفين أولًا</span>";
+        return;
+      }
+
+      result.innerText = "⏳ جاري التحليل...";
+      const hash1 = await calculateTextureHash(original);
+      const hash2 = await calculateTextureHash(check);
+      const percent = calculateSimilarity(hash1, hash2);
+
+      progress.value = percent;
+      if (percent >= 90)
+        result.innerHTML = `<span class='success'>✅ تطابق ${percent}% - مطابق تمامًا</span>`;
+      else if (percent >= 70)
+        result.innerHTML = `<span class='fail'>⚠️ تطابق ${percent}% - تحقق يدوي موصى به</span>`;
+      else
+        result.innerHTML = `<span class='fail'>❌ تطابق ${percent}% - محتمل اختلاف أو تزوير</span>`;
+    }
+  </script>
+
+</body>
+</html>
