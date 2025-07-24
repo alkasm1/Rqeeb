@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      background: #111;
-      color: #f90;
+      background: #0b0b0b;
+      color: #ff8800;
       font-family: 'Cairo', sans-serif;
       text-align: center;
       padding: 1rem;
@@ -15,7 +15,7 @@
     video {
       width: 100%;
       max-width: 500px;
-      border: 2px solid #f90;
+      border: 2px solid #ff8800;
       margin-bottom: 10px;
     }
     .container {
@@ -33,139 +33,147 @@
     .left {
       top: 60px;
       left: 20px;
-      border-color: #0f0;
+      border-color: #00ff00;
     }
     .right {
       top: 60px;
       right: 20px;
-      border-color: #f00;
+      border-color: #ff0000;
     }
     button {
       margin-top: 1rem;
       padding: 0.8rem;
       font-size: 1rem;
       border-radius: 8px;
-      background: #f90;
+      background: #ff8800;
       color: white;
       border: none;
       cursor: pointer;
     }
     canvas { display: none; }
+    #results {
+      margin-top: 1.5rem;
+      font-size: 1.1rem;
+      color: #ccc;
+    }
   </style>
 </head>
 <body>
-  <h2>📄 تحليل بصري دقيق للنسيج الداخلي</h2>
+  <h2>📄 تحليل التشويش الداخلي للمادة</h2>
   <div class="container">
-    <video id="video" autoplay></video>
+    <video id="video" autoplay playsinline></video>
     <div class="box left"></div>
     <div class="box right"></div>
   </div>
-  <button onclick="analyze()">🔍 نفّذ التحليل البصري الداخلي</button>
+  <button onclick="analyze()">🔍 تنفيذ التحليل الشبكي الداخلي</button>
   <canvas id="canvas"></canvas>
-  <div id="results" style="margin-top: 1.5rem; font-size: 1.2rem;"></div>
+  <div id="results"></div>
 
-<script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
 
-navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-  video.srcObject = stream;
-});
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => video.srcObject = stream)
+      .catch(err => alert("🚫 فشل تشغيل الكاميرا: " + err.message));
 
-function analyze() {
-  if (video.readyState < 2) {
-    alert("📷 الكاميرا لم تجهز بعد، أعد المحاولة بعد ثانية");
-    return;
-  }
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  setTimeout(() => {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const boxes = [
-      { name: "يسار", x: 20, y: 60 },
-      { name: "يمين", x: canvas.width - 170, y: 60 },
-    ];
-
-    const results = boxes.map(box => {
-      const grid = 5;
-      const step = 150 / grid;
-      const sobelValues = [];
-
-      for (let gy = 0; gy < grid; gy++) {
-        for (let gx = 0; gx < grid; gx++) {
-          const region = ctx.getImageData(box.x + gx * step, box.y + gy * step, step, step);
-          const sobelVal = sobel(region);
-          sobelValues.push(sobelVal);
-        }
+    function analyze() {
+      if (video.readyState < 2) {
+        alert("📷 الكاميرا لم تجهز بعد، أعد المحاولة بعد لحظة");
+        return;
       }
 
-      const avg = mean(sobelValues);
-      const dev = deviation(sobelValues, avg);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-      return {
-        name: box.name,
-        avg: avg.toFixed(2),
-        dev: dev.toFixed(2),
-        stability: describeStability(dev),
-      };
-    });
+      setTimeout(() => {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    displayResults(results);
-  }, 150); // تأخير 150ms لضمان التقاط الصورة
-}
+        const boxes = [
+          { name: "يسار", x: 20, y: 60 },
+          { name: "يمين", x: canvas.width - 170, y: 60 }
+        ];
 
-function mean(arr) {
-  return arr.reduce((a, b) => a + b, 0) / arr.length;
-}
-function deviation(arr, avg) {
-  return Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / arr.length);
-}
-function describeStability(dev) {
-  if (dev < 5) return "🟢 نسيج مستقر جدًا";
-  if (dev < 10) return "🟡 تشويش متذبذب";
-  return "🔴 تشويش غير منتظم";
-}
+        const grid = 5;
+        const step = 150 / grid;
 
-function displayResults(results) {
-  const r1 = results[0];
-  const r2 = results[1];
+        const results = boxes.map(box => {
+          const sobelValues = [];
 
-  const devDiff = Math.abs(r1.dev - r2.dev);
-  let comparison = "";
+          for (let gy = 0; gy < grid; gy++) {
+            for (let gx = 0; gx < grid; gx++) {
+              const region = ctx.getImageData(box.x + gx * step, box.y + gy * step, step, step);
+              const sobelVal = sobel(region);
+              sobelValues.push(sobelVal);
+            }
+          }
 
-  if (devDiff < 3) comparison = "✅ المواد تظهر تشابهًا كبيرًا في استقرار النسيج";
-  else if (devDiff < 7) comparison = "🟡 هناك تفاوت معتدل في تشويش المادة بين المربعين";
-  else comparison = "🔴 المواد مختلفة بوضوح من حيث انتظام النسيج الداخلي";
+          const avg = mean(sobelValues);
+          const dev = deviation(sobelValues, avg);
+          const stability = describeStability(dev);
 
-  document.getElementById("results").innerHTML = `
-    <strong>📦 مربع ${r1.name}:</strong><br>
-    - متوسط الحدة: ${r1.avg}<br>
-    - انحراف التوزيع: ${r1.dev}<br>
-    - التوصيف: ${r1.stability}<br><br>
+          return {
+            name: box.name,
+            avg: avg.toFixed(2),
+            dev: dev.toFixed(2),
+            stability: stability
+          };
+        });
 
-    <strong>📦 مربع ${r2.name}:</strong><br>
-    - متوسط الحدة: ${r2.avg}<br>
-    - انحراف التوزيع: ${r2.dev}<br>
-    - التوصيف: ${r2.stability}<br><br>
+        displayResults(results);
+      }, 150);
+    }
 
-    <strong>🔍 نتيجة التحليل:</strong><br>
-    ${comparison}
-  `;
-}
+    function sobel(imageData) {
+      let sum = 0;
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = (data[i] + data[i+1] + data[i+2]) / 3;
+        sum += gray;
+      }
+      return sum / (imageData.width * imageData.height);
+    }
 
-function sobel(imageData) {
-  let sum = 0;
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const gray = (data[i] + data[i+1] + data[i+2]) / 3;
-    sum += gray;
-  }
-  return sum / (imageData.width * imageData.height);
-}
-</script>
+    function mean(arr) {
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    }
+
+    function deviation(arr, avg) {
+      return Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / arr.length);
+    }
+
+    function describeStability(dev) {
+      if (dev < 5) return "🟢 نسيج مستقر جدًا";
+      if (dev < 10) return "🟡 تشويش متذبذب";
+      return "🔴 تشويش غير منتظم";
+    }
+
+    function displayResults(results) {
+      const r1 = results[0];
+      const r2 = results[1];
+      const devDiff = Math.abs(r1.dev - r2.dev);
+
+      let comparison = "";
+      if (devDiff < 3) comparison = "✅ المواد تظهر تشابهًا كبيرًا في انتظام التشويش";
+      else if (devDiff < 7) comparison = "🟡 هناك تفاوت معتدل في تشويش المادة بين المربعين";
+      else comparison = "🔴 المواد مختلفة بوضوح من حيث انتظام النسيج الداخلي";
+
+      document.getElementById("results").innerHTML = `
+        <strong>📦 مربع ${r1.name}:</strong><br>
+        - متوسط الحدة: ${r1.avg}<br>
+        - انحراف التوزيع: ${r1.dev}<br>
+        - التوصيف: ${r1.stability}<br><br>
+
+        <strong>📦 مربع ${r2.name}:</strong><br>
+        - متوسط الحدة: ${r2.avg}<br>
+        - انحراف التوزيع: ${r2.dev}<br>
+        - التوصيف: ${r2.stability}<br><br>
+
+        <strong>🔍 نتيجة التحليل:</strong><br>
+        ${comparison}
+      `;
+    }
+  </script>
 </body>
 </html>
