@@ -2,12 +2,12 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>تحليل نسيج الورق | RKEEB</title>
+  <title>تحليل نسيج المادة | RKEEB</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
-      background: #0b0b0b;
-      color: #ff8800;
+      background: #111;
+      color: #f90;
       font-family: 'Cairo', sans-serif;
       text-align: center;
       padding: 1rem;
@@ -15,7 +15,7 @@
     video {
       width: 100%;
       max-width: 500px;
-      border: 2px solid #ff8800;
+      border: 2px solid #f90;
       margin-bottom: 10px;
     }
     .container {
@@ -33,129 +33,133 @@
     .left {
       top: 60px;
       left: 20px;
-      border-color: #00ff00;
+      border-color: #0f0;
     }
     .right {
       top: 60px;
       right: 20px;
-      border-color: #ff0000;
+      border-color: #f00;
     }
     button {
       margin-top: 1rem;
       padding: 0.8rem;
       font-size: 1rem;
       border-radius: 8px;
-      background: #ff8800;
+      background: #f90;
       color: white;
       border: none;
       cursor: pointer;
-    }
-    #result {
-      margin-top: 1rem;
-    }
-    .bar {
-      height: 20px;
-      margin: 5px auto;
-      background: #00ccff;
-    }
-    .description {
-      font-size: 0.9rem;
-      margin-bottom: 10px;
-      color: #ccc;
     }
     canvas { display: none; }
   </style>
 </head>
 <body>
-  <h2>📄 تحليل التشويش البصري للمادة</h2>
+  <h2>📄 تحليل بصري دقيق للنسيج الداخلي</h2>
   <div class="container">
     <video id="video" autoplay></video>
     <div class="box left"></div>
     <div class="box right"></div>
   </div>
-  <button onclick="analyze()">تحليل النسيج المحلي 📊</button>
-
-  <div id="result">
-    <h3>🔍 النتائج البصرية</h3>
-    <div>
-      <div class="description" id="descLeft">🟦 يسار: ...</div>
-      <div class="bar" id="barLeft" style="width: 0%;"></div>
-    </div>
-    <div>
-      <div class="description" id="descRight">🟥 يمين: ...</div>
-      <div class="bar" id="barRight" style="width: 0%;"></div>
-    </div>
-    <div id="compare">📊 نسبة التشابه: ...</div>
-  </div>
-
+  <button onclick="analyze()">🔍 نفّذ التحليل البصري الداخلي</button>
   <canvas id="canvas"></canvas>
+  <div id="results" style="margin-top: 1.5rem; font-size: 1.2rem;"></div>
 
-  <script>
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => video.srcObject = stream)
-      .catch(err => alert("🚫 فشل تشغيل الكاميرا: " + err.message));
+navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+  video.srcObject = stream;
+});
 
-    function analyze() {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+function analyze() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const left = ctx.getImageData(20, 60, 150, 150);
-      const right = ctx.getImageData(canvas.width - 170, 60, 150, 150);
+  const boxes = [
+    { name: "يسار", x: 20, y: 60 },
+    { name: "يمين", x: canvas.width - 170, y: 60 },
+  ];
 
-      const edgeLeft = sobelIntensity(left);
-      const edgeRight = sobelIntensity(right);
+  const results = boxes.map(box => {
+    const data = ctx.getImageData(box.x, box.y, 150, 150);
+    const grid = 5;
+    const step = 150 / grid;
+    const sobelValues = [];
 
-      const percentLeft = Math.floor(edgeLeft * 100);
-      const percentRight = Math.floor(edgeRight * 100);
-
-      document.getElementById("barLeft").style.width = percentLeft + "%";
-      document.getElementById("barRight").style.width = percentRight + "%";
-      document.getElementById("descLeft").textContent = "🟦 يسار: " + describeEdge(percentLeft);
-      document.getElementById("descRight").textContent = "🟥 يمين: " + describeEdge(percentRight);
-
-      const diff = 100 - Math.abs(percentLeft - percentRight);
-      document.getElementById("compare").textContent = `📊 نسبة التشابه: ${diff}%`;
-    }
-
-    function sobelIntensity(imgData) {
-      const w = imgData.width;
-      const h = imgData.height;
-      const data = imgData.data;
-      const gray = [];
-
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = (data[i] + data[i+1] + data[i+2]) / 3;
-        gray.push(avg);
+    for (let gy = 0; gy < grid; gy++) {
+      for (let gx = 0; gx < grid; gx++) {
+        const region = ctx.getImageData(box.x + gx * step, box.y + gy * step, step, step);
+        const sobelVal = sobel(region);
+        sobelValues.push(sobelVal);
       }
-
-      let total = 0;
-      for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
-          const gx =
-            -gray[(y-1)*w + (x-1)] -2*gray[y*w + (x-1)] -gray[(y+1)*w + (x-1)] +
-             gray[(y-1)*w + (x+1)] +2*gray[y*w + (x+1)] +gray[(y+1)*w + (x+1)];
-          const gy =
-            -gray[(y-1)*w + (x-1)] -2*gray[(y-1)*w + x] -gray[(y-1)*w + (x+1)] +
-             gray[(y+1)*w + (x-1)] +2*gray[(y+1)*w + x] +gray[(y+1)*w + (x+1)];
-          const magnitude = Math.sqrt(gx * gx + gy * gy);
-          total += magnitude;
-        }
-      }
-      return total / (w * h * 255);
     }
 
-    function describeEdge(val) {
-      if (val > 80) return "نمط نسيج خشن جدًا";
-      if (val > 60) return "نمط نسيج متوسط عالي";
-      if (val > 40) return "خلفية متوسطة";
-      if (val > 20) return "خلفية ناعمة منخفضة الحدة";
-      return "سطح ناعم جدًا";
-    }
-  </script>
+    const avg = mean(sobelValues);
+    const dev = deviation(sobelValues, avg);
+
+    return {
+      name: box.name,
+      avg: avg.toFixed(2),
+      dev: dev.toFixed(2),
+      stability: describeStability(dev),
+    };
+  });
+
+  displayResults(results);
+}
+
+function mean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+function deviation(arr, avg) {
+  return Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / arr.length);
+}
+function describeStability(dev) {
+  if (dev < 5) return "🟢 نسيج مستقر جدًا";
+  if (dev < 10) return "🟡 تشويش متذبذب";
+  return "🔴 تشويش غير منتظم";
+}
+
+function displayResults(results) {
+  const r1 = results[0];
+  const r2 = results[1];
+
+  let comparison = "";
+  const devDiff = Math.abs(r1.dev - r2.dev);
+
+  if (devDiff < 3) comparison = "✅ المواد تظهر تشابهًا كبيرًا في استقرار النسيج";
+  else if (devDiff < 7) comparison = "🟡 هناك تفاوت معتدل في تشويش المادة بين المربعين";
+  else comparison = "🔴 المواد مختلفة بوضوح من حيث انتظام النسيج الداخلي";
+
+  document.getElementById("results").innerHTML = `
+    <strong>📦 مربع ${r1.name}:</strong><br>
+    - متوسط الحدة: ${r1.avg}<br>
+    - انحراف التوزيع: ${r1.dev}<br>
+    - التوصيف: ${r1.stability}<br><br>
+
+    <strong>📦 مربع ${r2.name}:</strong><br>
+    - متوسط الحدة: ${r2.avg}<br>
+    - انحراف التوزيع: ${r2.dev}<br>
+    - التوصيف: ${r2.stability}<br><br>
+
+    <strong>🔍 نتيجة التحليل:</strong><br>
+    ${comparison}
+  `;
+}
+
+// دالة Sobel الرمزية للتجريب:
+function sobel(imageData) {
+  let sum = 0;
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = (data[i] + data[i+1] + data[i+2]) / 3;
+    sum += gray;
+  }
+  return sum / (imageData.width * imageData.height);
+}
+</script>
 </body>
 </html>
