@@ -2,7 +2,7 @@
 <html lang="ar">
 <head>
   <meta charset="UTF-8" />
-  <title>RKEEB | تحديد مناطق للتحقق</title>
+  <title>تحليل نسيج منطقتين | RKEEB</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
@@ -17,7 +17,6 @@
       margin: 1rem auto;
       display: block;
       max-width: 100%;
-      touch-action: none;
     }
     input, button {
       padding: 0.8rem;
@@ -38,128 +37,106 @@
     #result {
       margin-top: 1rem;
       font-size: 1.2rem;
+      color: #ccc;
     }
   </style>
 </head>
 <body>
-  <h2>👁️ حدد منطقتين داخل الصورة (باللمس أو الفأرة)</h2>
+  <h2>📤 تحليل نسيج منطقتين داخل صورة</h2>
   <input type="file" accept="image/*" id="imageInput" />
   <canvas id="canvas" width="600" height="400"></canvas>
-  <button onclick="compareRegions()">تحليل التطابق</button>
-  <button onclick="resetCanvas()">إعادة التحديد 🔄</button>
-  <div id="result">🟦⬜ بانتظار التحديد...</div>
+  <button onclick="compareAuto()">📊 تحليل التطابق الذكي</button>
+  <div id="result">🔍 بانتظار التحليل...</div>
 
-  <script>
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    let img = new Image();
-    let regions = [];
-    let drawing = false;
-    let startX, startY;
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let img = new Image();
 
-    document.getElementById("imageInput").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = () => {
-        img.src = reader.result;
-        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        regions = [];
+  document.getElementById("imageInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      img.src = reader.result;
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // رسم المربعات تلقائيًا
+        ctx.strokeStyle = "#00ff00";
+        ctx.strokeRect(80, 100, 120, 120);
+        ctx.strokeStyle = "#ff0000";
+        ctx.strokeRect(400, 100, 120, 120);
       };
-      reader.readAsDataURL(file);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function compareAuto() {
+    const resultDiv = document.getElementById("result");
+    const regions = [
+      { x: 80, y: 100, w: 120, h: 120 },
+      { x: 400, y: 100, w: 120, h: 120 }
+    ];
+
+    const analysis = regions.map(r => {
+      const grid = 5;
+      const stepX = r.w / grid;
+      const stepY = r.h / grid;
+      const values = [];
+
+      for (let gy = 0; gy < grid; gy++) {
+        for (let gx = 0; gx < grid; gx++) {
+          const data = ctx.getImageData(r.x + gx * stepX, r.y + gy * stepY, stepX, stepY);
+          values.push(sobel(data));
+        }
+      }
+
+      const avg = mean(values);
+      const dev = deviation(values, avg);
+      return { avg, dev };
     });
 
-    function getCoords(e) {
-      const rect = canvas.getBoundingClientRect();
-      if (e.touches && e.touches.length > 0) {
-        e.preventDefault();
-        return {
-          x: e.touches[0].clientX - rect.left,
-          y: e.touches[0].clientY - rect.top
-        };
-      } else if (e.changedTouches && e.changedTouches.length > 0) {
-        e.preventDefault();
-        return {
-          x: e.changedTouches[0].clientX - rect.left,
-          y: e.changedTouches[0].clientY - rect.top
-        };
-      } else {
-        return {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
-        };
-      }
-    }
+    const [a, b] = analysis;
+    const totalDiff = (Math.abs(a.avg - b.avg) + Math.abs(a.dev - b.dev)) / 2;
+    const similarity = 100 - Math.min(totalDiff, 100);
 
-    function startDraw(e) {
-      if (regions.length >= 2) return;
-      drawing = true;
-      const { x, y } = getCoords(e);
-      startX = x;
-      startY = y;
-    }
+    let verdict = "";
+    if (similarity > 90) verdict = "✅ المنطقتان متطابقتان فعليًا في النسيج الداخلي";
+    else if (similarity > 70) verdict = "🟡 هناك تقارب جزئي في التشويش";
+    else verdict = "🔴 المنطقتان مختلفتان من حيث البنية البصرية";
 
-    function endDraw(e) {
-      if (!drawing || regions.length >= 2) return;
-      drawing = false;
-      const { x: endX, y: endY } = getCoords(e);
-      const x = Math.min(startX, endX);
-      const y = Math.min(startY, endY);
-      const w = Math.abs(endX - startX);
-      const h = Math.abs(endY - startY);
-      regions.push({ x, y, w, h });
-      ctx.strokeStyle = regions.length === 1 ? "#00ff00" : "#ff0000";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x, y, w, h);
-    }
+    resultDiv.innerHTML = `
+      <strong>🟦 المنطقة اليسرى:</strong><br>
+      - متوسط الحدة: ${a.avg.toFixed(2)}<br>
+      - انحراف التوزيع: ${a.dev.toFixed(2)}<br><br>
 
-    canvas.addEventListener("mousedown", startDraw);
-    canvas.addEventListener("mouseup", endDraw);
-    canvas.addEventListener("touchstart", startDraw, { passive: false });
-    canvas.addEventListener("touchend", endDraw, { passive: false });
+      <strong>🟥 المنطقة اليمنى:</strong><br>
+      - متوسط الحدة: ${b.avg.toFixed(2)}<br>
+      - انحراف التوزيع: ${b.dev.toFixed(2)}<br><br>
 
-    async function compareRegions() {
-      const result = document.getElementById("result");
-      if (regions.length < 2) {
-        result.innerText = "⚠️ يرجى تحديد مربعين أولًا";
-        return;
-      }
-      const hashA = await getRegionHash(regions[0]);
-      const hashB = await getRegionHash(regions[1]);
-      const percent = compareHashes(hashA, hashB);
-      result.innerText = `📊 نسبة التطابق بين المنطقتين: ${percent}%`;
-    }
+      <strong>📈 نسبة التطابق الواقعي:</strong> ${similarity.toFixed(1)}%<br>
+      <strong>🔍 التقييم النهائي:</strong> ${verdict}
+    `;
+  }
 
-    function getRegionHash(region) {
-      return new Promise((resolve) => {
-        const temp = document.createElement("canvas");
-        temp.width = region.w;
-        temp.height = region.h;
-        const tctx = temp.getContext("2d");
-        tctx.drawImage(canvas, region.x, region.y, region.w, region.h, 0, 0, region.w, region.h);
-        temp.toBlob(async (blob) => {
-          const arrayBuffer = await blob.arrayBuffer();
-          const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
-          const hashArray = Array.from(new Uint8Array(hashBuffer));
-          const hex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-          resolve(hex);
-        });
-      });
+  function sobel(imgData) {
+    const d = imgData.data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const gray = (d[i] + d[i+1] + d[i+2]) / 3;
+      sum += gray;
     }
+    return sum / (imgData.width * imgData.height);
+  }
 
-    function compareHashes(hashA, hashB) {
-      let match = 0;
-      for (let i = 0; i < hashA.length; i++) {
-        if (hashA[i] === hashB[i]) match++;
-      }
-      return Math.floor((match / hashA.length) * 100);
-    }
+  function mean(arr) {
+    return arr.reduce((a,b) => a + b, 0) / arr.length;
+  }
 
-    function resetCanvas() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      regions = [];
-      document.getElementById("result").innerText = "🟦⬜ بانتظار التحديد...";
-    }
-  </script>
+  function deviation(arr, avg) {
+    return Math.sqrt(arr.reduce((a,b) => a + Math.pow(b - avg, 2), 0) / arr.length);
+  }
+</script>
 </body>
 </html>
