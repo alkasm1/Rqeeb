@@ -247,26 +247,35 @@
         reader.readAsDataURL(file);
       });
     }
-  </script>
-
-</body>
-</html>
 <script>
-  let originalImage = null, checkImage = null;
+  let originalReady = false;
+  let checkReady = false;
 
   function storeTextureImage(file, type) {
-    if (type === 'original') originalImage = file;
-    else if (type === 'check') checkImage = file;
+    const reader = new FileReader();
 
-    if (originalImage && checkImage) {
-      const originalURL = URL.createObjectURL(originalImage);
-      const checkURL = URL.createObjectURL(checkImage);
+    reader.onload = () => {
+      const base64 = reader.result;
 
-      sessionStorage.setItem("originalTemp", originalURL);
-      sessionStorage.setItem("checkTemp", checkURL);
-      window.location.href = "texture-dual-compare.html";
-    } else {
-      alert("📸 تم التقاط صورة، الرجاء التقاط الصورة الثانية.");
-    }
+      if (type === 'original') {
+        sessionStorage.setItem("originalBase64", base64);
+        originalReady = true;
+      }
+
+      if (type === 'check') {
+        sessionStorage.setItem("checkBase64", base64);
+        checkReady = true;
+      }
+
+      if (originalReady && checkReady) {
+        window.location.href = "texture-dual-compare.html";
+      }
+    };
+
+    reader.onerror = () => {
+      alert("🚫 حدث خطأ أثناء تحميل الصورة");
+    };
+
+    reader.readAsDataURL(file);
   }
 </script>
