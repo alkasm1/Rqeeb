@@ -101,6 +101,14 @@
         result.innerText = "❌ حدث خطأ أثناء التحليل. تأكد من نوع الصور.";
       }
     }
+
+    // دالة التحليل النسيجي باستخدام arrayBuffer فقط
+    async function calculateTextureHash(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
   </script>
 
 </body>
