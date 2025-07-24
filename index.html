@@ -115,14 +115,6 @@
       <button onclick="analyzeImages()">تحليل الصور التقليدي 🔍</button>
     </div>
 
-    <!-- القسم الجديد: صورة تحتوي الأصل والمشتبه به -->
-    <div class="card">
-      <h3>🖼️ صورة موحدة (نصف أصل + نصف تحقق)</h3>
-      <input type="file" id="singleImage" accept="image/*">
-      <br><br>
-      <button onclick="triggerSingle()">تحليل الصورة الموحدة 🔍</button>
-    </div>
-
     <div class="card">
       <div id="resultMessage">👁️ بانتظار تحميل الصورة...</div>
       <progress id="matchProgress" value="0" max="100"></progress>
@@ -247,35 +239,3 @@
         reader.readAsDataURL(file);
       });
     }
-<script>
-  let originalReady = false;
-  let checkReady = false;
-
-  function storeTextureImage(file, type) {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const base64 = reader.result;
-
-      if (type === 'original') {
-        sessionStorage.setItem("originalBase64", base64);
-        originalReady = true;
-      }
-
-      if (type === 'check') {
-        sessionStorage.setItem("checkBase64", base64);
-        checkReady = true;
-      }
-
-      if (originalReady && checkReady) {
-        window.location.href = "texture-dual-compare.html";
-      }
-    };
-
-    reader.onerror = () => {
-      alert("🚫 حدث خطأ أثناء تحميل الصورة");
-    };
-
-    reader.readAsDataURL(file);
-  }
-</script>
